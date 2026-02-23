@@ -21,9 +21,6 @@ return new class extends Migration {
 
             $table->timestamps();
 
-            $table->index(['colocation_id', 'spent_at']);
-            $table->index(['category_id']);
-            $table->index(['payer_id']);
         });
     }
 
