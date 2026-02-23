@@ -17,6 +17,9 @@ class Invitation extends Model
         'accepted_by',
     ];
 
+    protected $casts = [
+        'expires_at' => 'datetime',
+    ];
     public function colocation(): BelongsTo{
         return $this->belongsTo(Colocation::class);
     }
