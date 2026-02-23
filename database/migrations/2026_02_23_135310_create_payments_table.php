@@ -4,22 +4,28 @@ use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
 
-return new class extends Migration
-{
-    /**
-     * Run the migrations.
-     */
+return new class extends Migration {
     public function up(): void
     {
         Schema::create('payments', function (Blueprint $table) {
             $table->id();
+
+            $table->foreignId('colocation_id')->constrained('colocations')->cascadeOnDelete();
+
+            $table->foreignId('from_user_id')->constrained('users')->restrictOnDelete();
+            $table->foreignId('to_user_id')->constrained('users')->restrictOnDelete();
+
+            $table->decimal('amount', 10, 2);
+            $table->timestamp('paid_at')->useCurrent();
+
+            $table->foreignId('created_by')->constrained('users')->restrictOnDelete();
+
             $table->timestamps();
+
+            $table->index(['colocation_id', 'paid_at']);
         });
     }
 
-    /**
-     * Reverse the migrations.
-     */
     public function down(): void
     {
         Schema::dropIfExists('payments');
