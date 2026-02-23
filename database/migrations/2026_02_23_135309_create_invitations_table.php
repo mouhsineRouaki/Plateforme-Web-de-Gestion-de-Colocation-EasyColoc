@@ -14,16 +14,13 @@ return new class extends Migration {
 
             $table->string('invited_email');
             $table->string('token')->unique();
-            $table->string('status')->default('PENDING'); // PENDING | ACCEPTED | REFUSED | EXPIRED | CANCELLED
+            $table->string('status')->default('PENDING');
             $table->timestamp('expires_at');
 
             $table->foreignId('sent_by')->constrained('users')->cascadeOnDelete();
             $table->foreignId('accepted_by')->nullable()->constrained('users')->nullOnDelete();
 
             $table->timestamps();
-
-            $table->index(['colocation_id', 'status']);
-            $table->index(['invited_email']);
         });
     }
 
