@@ -9,17 +9,12 @@ return new class extends Migration {
     {
         Schema::create('reputation_events', function (Blueprint $table) {
             $table->id();
-
             $table->foreignId('user_id')->constrained('users')->cascadeOnDelete();
             $table->foreignId('colocation_id')->nullable()->constrained('colocations')->nullOnDelete();
-
             $table->string('type');
             $table->integer('delta');
-
             $table->json('meta')->nullable();
             $table->timestamps();
-
-            $table->index(['user_id', 'created_at']);
         });
     }
 
