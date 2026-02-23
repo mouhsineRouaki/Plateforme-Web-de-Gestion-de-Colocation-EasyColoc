@@ -18,8 +18,6 @@ return new class extends Migration {
             $table->timestamps();
 
             $table->primary(['colocation_id', 'user_id']);
-            $table->index(['user_id', 'left_at']);
-            $table->index(['colocation_id', 'left_at']);
         });
     }
 
