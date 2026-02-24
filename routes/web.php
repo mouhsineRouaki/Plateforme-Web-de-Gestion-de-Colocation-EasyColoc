@@ -5,6 +5,8 @@ use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\InvitationController;
 use App\Http\Controllers\ColocationController;
+use App\Http\Controllers\AdminDashboardController;
+use App\Http\Controllers\AdminUserController;
 Route::get('/', function () {
     return view('welcome');
 });
@@ -22,6 +24,14 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::post('/invitations/join', [InvitationController::class, 'joinFromLink'])->name('invitations.join.link');
     Route::post('/invitations/{token}/accept', [InvitationController::class, 'accept'])->name('invitations.accept');
     Route::post('/invitations/{token}/refuse', [InvitationController::class, 'refuse'])->name('invitations.refuse');
+});
+// route role admin 
+
+Route::middleware(['auth' , 'verified' , 'globalAdmin'])->group(function(){
+    Route::get('/dashboard', [AdminDashboardController::class, 'index'])->name('dashboard');
+    Route::get('/users', [AdminUserController::class, 'index'])->name('users.index');
+    Route::patch('/users/{user}/ban', [AdminUserController::class, 'ban'])->name('users.ban');
+    Route::patch('/users/{user}/unban', [AdminUserController::class, 'unban'])->name('users.unban');
 });
 
 require __DIR__ . '/auth.php';
