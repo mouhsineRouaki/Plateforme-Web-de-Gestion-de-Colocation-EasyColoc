@@ -10,14 +10,33 @@ class DashboardController extends Controller
     {
         $user = $request->user();
 
-        $activeColocation = $user->colocations()
+        if ($user->role === 'GLOBAL_ADMIN') {
+            return redirect()->route('admin.dashboard');
+        }
+
+        $activeOwnerColocation = $user->colocations()
+            ->wherePivot('role_in_colocation', 'OWNER')
             ->wherePivotNull('left_at')
             ->where('status', 'ACTIVE')
-            ->with(['members' => function ($q) {
-                $q->wherePivotNull('left_at');
-            }])
             ->first();
 
-        return view('dashboard', compact('user', 'activeColocation'));
+        if ($activeOwnerColocation) {
+            return redirect()->route('owner.dashboard');
+        }
+
+        $activeMemberColocation = $user->colocations()
+            ->wherePivot('role_in_colocation', 'MEMBER')
+            ->wherePivotNull('left_at')
+            ->where('status', 'ACTIVE')
+            ->first();
+
+        if ($activeMemberColocation) {
+            return redirect()->route('member.dashboard');
+        }
+
+        return view('dashboard', [
+            'user' => $user,
+            'activeColocation' => null,
+        ]);
     }
 }
