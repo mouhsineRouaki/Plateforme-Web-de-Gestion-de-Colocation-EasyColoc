@@ -5,9 +5,77 @@ namespace App\Http\Controllers;
 use App\Models\Invitation;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
 
 class InvitationController extends Controller
 {
+    public function send(Request $request)
+    {
+        $data = $request->validate([
+            'invited_email' => ['required', 'email', 'max:255'],
+        ]);
+
+        $currentUser = $request->user();
+        $invitedEmail = strtolower(trim($data['invited_email']));
+
+        $ownerColocation = $currentUser->colocations()
+            ->wherePivotNull('left_at')
+            ->wherePivot('role_in_colocation', 'OWNER')
+            ->where('status', 'ACTIVE')
+            ->first();
+
+        if (!$ownerColocation) {
+            return back()->withErrors([
+                'invited_email' => 'Vous devez etre owner d\'une colocation active.',
+            ]);
+        }
+
+        if ($invitedEmail === strtolower($currentUser->email)) {
+            return back()->withErrors([
+                'invited_email' => 'Vous ne pouvez pas vous inviter vous-même.',
+            ]);
+        }
+
+        $isAlreadyActiveMember = $ownerColocation->members()
+            ->where('email', $invitedEmail)
+            ->wherePivotNull('left_at')
+            ->exists();
+
+        if ($isAlreadyActiveMember) {
+            return back()->withErrors([
+                'invited_email' => 'Cet utilisateur est déjà membre actif de votre colocation.',
+            ]);
+        }
+
+        $alreadyHasPendingInvitation = Invitation::query()
+            ->where('colocation_id', $ownerColocation->id)
+            ->where('invited_email', $invitedEmail)
+            ->where('status', 'PENDING')
+            ->where('expires_at', '>', now())
+            ->exists();
+
+        if ($alreadyHasPendingInvitation) {
+            return back()->withErrors([
+                'invited_email' => 'Une invitation active existe déjà pour cet email.',
+            ]);
+        }
+
+        $token = Str::random(40);
+
+        Invitation::create([
+            'colocation_id' => $ownerColocation->id,
+            'invited_email' => $invitedEmail,
+            'token' => $token,
+            'status' => 'PENDING',
+            'expires_at' => now()->addDays(3),
+            'sent_by' => $currentUser->id,
+        ]);
+
+        $invitationLink = route('invitations.show', $token);
+
+        return back()->with('success', "Invitation créée pour {$invitedEmail}. Lien: {$invitationLink}");
+    }
+
     public function joinFromLink(Request $request)
     {
         $data = $request->validate([
