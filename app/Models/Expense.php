@@ -4,7 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
-
+use Illuminate\Database\Eloquent\Relations\HasMany;
 class Expense extends Model
 {
     protected $fillable = [
@@ -23,4 +23,9 @@ class Expense extends Model
     public function payer(): BelongsTo{
         return $this->belongsTo(User::class, 'payer_id');
     }
+
+    public function splits(): HasMany{
+        return $this->hasMany(ExpenseSplit::class);
+    }
+    
 }
