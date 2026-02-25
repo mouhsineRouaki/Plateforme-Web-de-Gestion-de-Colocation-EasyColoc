@@ -12,7 +12,9 @@ return Application::configure(basePath: dirname(__DIR__))
     )
     ->withMiddleware(function (Middleware $middleware): void {
         $middleware->alias([
-            'globalAdmin'=> \App\Http\Middleware\IsGlobalAdmin::class,
+            'globalAdmin' => \App\Http\Middleware\IsGlobalAdmin::class,
+            'owner' => \App\Http\Middleware\IsOwner::class,
+            'member' => \App\Http\Middleware\IsMember::class,
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
