@@ -97,4 +97,13 @@ class User extends Authenticatable
     {
         return $this->hasMany(ReputationEvent::class);
     }
+    public function debtsOwed(): HasMany
+    {
+        return $this->hasMany(Debt::class, 'from_user_id');
+    }
+
+    public function debtsToReceive(): HasMany
+    {
+        return $this->hasMany(Debt::class, 'to_user_id');
+    }
 }
