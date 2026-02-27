@@ -10,6 +10,19 @@
                 </div>
             @endif
 
+            @if (session('warning'))
+                <div class="mt-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+                    {{ session('warning') }}
+                </div>
+            @endif
+
+            @if (session('invitation_link'))
+                <div class="mt-4 rounded-xl border border-slate-200 bg-white p-4">
+                    <p class="text-sm font-semibold text-slate-900">Lien invitation</p>
+                    <p class="mt-2 break-all text-sm text-slate-700">{{ session('invitation_link') }}</p>
+                </div>
+            @endif
+
             @if ($errors->any())
                 <div class="mt-4 rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-800">
                     <ul class="list-disc pl-5">
