@@ -16,9 +16,6 @@ class CategoryController extends Controller
                 'required',
                 'string',
                 'max:100',
-                Rule::unique('categories', 'name')->where(function ($query) use ($colocation) {
-                    return $query->where('colocation_id', $colocation->id);
-                }),
             ],
             'color' => ['nullable', 'string', 'max:20'],
         ]);
