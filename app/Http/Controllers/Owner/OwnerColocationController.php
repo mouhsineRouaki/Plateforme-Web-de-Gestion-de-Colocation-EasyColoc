@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Owner;
 use App\Models\Colocation;
 use App\Models\Debt;
 use App\Models\Payment;
+use App\Models\ReputationEvent;
 use App\Models\User;
 use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
@@ -132,6 +133,104 @@ class OwnerColocationController extends Controller
         });
 
         return back()->with('success', 'Membre retire. Les dettes ont ete assignees a l owner.');
+    }
+
+    public function leave(Request $request, Colocation $colocation)
+    {
+        $owner = $request->user();
+
+        $ownerMembership = $owner->colocations()
+            ->where('colocations.id', $colocation->id)
+            ->wherePivot('role_in_colocation', 'OWNER')
+            ->wherePivotNull('left_at')
+            ->exists();
+
+        abort_if(! $ownerMembership, 403);
+
+        $successor = $colocation->members()
+            ->wherePivotNull('left_at')
+            ->wherePivot('role_in_colocation', 'MEMBER')
+            ->orderByDesc('reputation_score')
+            ->orderBy('colocation_user.joined_at')
+            ->orderBy('users.id')
+            ->first();
+
+        if (! $successor) {
+            return back()->withErrors([
+                'colocation' => 'Impossible de quitter: aucun membre actif disponible pour devenir owner.',
+            ]);
+        }
+
+        $hasDebtBeforeLeave = Debt::query()
+            ->where('colocation_id', $colocation->id)
+            ->where('from_user_id', $owner->id)
+            ->where('amount', '>', 0)
+            ->exists();
+
+        DB::transaction(function () use ($colocation, $owner, $successor, $hasDebtBeforeLeave) {
+            $this->reassignMemberDebtsToReplacement($colocation->id, $owner->id, $successor->id);
+
+            $colocation->members()->updateExistingPivot($successor->id, [
+                'role_in_colocation' => 'OWNER',
+            ]);
+
+            $colocation->members()->updateExistingPivot($owner->id, [
+                'left_at' => now(),
+            ]);
+
+            $this->applyLeaveReputation($owner, $colocation->id, $hasDebtBeforeLeave);
+        });
+
+        return redirect()
+            ->route('dashboard')
+            ->with('success', "Vous avez quitte la colocation. {$successor->name} est maintenant owner.");
+    }
+
+    private function reassignMemberDebtsToReplacement(int $colocationId, int $leavingUserId, int $replacementUserId): void
+    {
+        $memberDebts = Debt::query()
+            ->where('colocation_id', $colocationId)
+            ->where('amount', '>', 0)
+            ->where(function ($query) use ($leavingUserId) {
+                $query->where('from_user_id', $leavingUserId)
+                    ->orWhere('to_user_id', $leavingUserId);
+            })
+            ->get();
+
+        foreach ($memberDebts as $debt) {
+            $amount = (float) $debt->amount;
+            if ($amount <= 0) {
+                continue;
+            }
+
+            if ((int) $debt->from_user_id === $leavingUserId && (int) $debt->to_user_id !== $replacementUserId) {
+                $this->addNetDebt($colocationId, $replacementUserId, (int) $debt->to_user_id, $amount);
+            }
+
+            if ((int) $debt->to_user_id === $leavingUserId && (int) $debt->from_user_id !== $replacementUserId) {
+                $this->addNetDebt($colocationId, (int) $debt->from_user_id, $replacementUserId, $amount);
+            }
+
+            $debt->amount = 0;
+            $debt->save();
+        }
+    }
+
+    private function applyLeaveReputation(User $user, int $colocationId, bool $hasDebt): void
+    {
+        $delta = $hasDebt ? -1 : 1;
+
+        $user->increment('reputation_score', $delta);
+
+        ReputationEvent::create([
+            'user_id' => $user->id,
+            'colocation_id' => $colocationId,
+            'type' => $hasDebt ? 'LEAVE_WITH_DEBT' : 'LEAVE_WITHOUT_DEBT',
+            'delta' => $delta,
+            'meta' => [
+                'reason' => 'leave_colocation',
+            ],
+        ]);
     }
 
     private function addNetDebt(int $colocationId, int $debtorId, int $creditorId, float $amount): void
