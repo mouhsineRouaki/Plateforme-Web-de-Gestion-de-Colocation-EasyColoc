@@ -3,9 +3,12 @@
 namespace App\Http\Controllers;
 
 use App\Models\Invitation;
+use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Str;
+use Throwable;
 
 class InvitationController extends Controller
 {
@@ -24,15 +27,15 @@ class InvitationController extends Controller
             ->where('status', 'ACTIVE')
             ->first();
 
-        if (!$ownerColocation) {
+        if (! $ownerColocation) {
             return back()->withErrors([
-                'invited_email' => 'Vous devez etre owner d\'une colocation active.',
+                'invited_email' => 'Vous devez etre owner d une colocation active.',
             ]);
         }
 
         if ($invitedEmail === strtolower($currentUser->email)) {
             return back()->withErrors([
-                'invited_email' => 'Vous ne pouvez pas vous inviter vous-même.',
+                'invited_email' => 'Vous ne pouvez pas vous inviter vous meme.',
             ]);
         }
 
@@ -43,7 +46,7 @@ class InvitationController extends Controller
 
         if ($isAlreadyActiveMember) {
             return back()->withErrors([
-                'invited_email' => 'Cet utilisateur est déjà membre actif de votre colocation.',
+                'invited_email' => 'Cet utilisateur est deja membre actif de votre colocation.',
             ]);
         }
 
@@ -56,13 +59,13 @@ class InvitationController extends Controller
 
         if ($alreadyHasPendingInvitation) {
             return back()->withErrors([
-                'invited_email' => 'Une invitation active existe déjà pour cet email.',
+                'invited_email' => 'Une invitation active existe deja pour cet email.',
             ]);
         }
 
         $token = Str::random(40);
 
-        Invitation::create([
+        $invitation = Invitation::create([
             'colocation_id' => $ownerColocation->id,
             'invited_email' => $invitedEmail,
             'token' => $token,
@@ -73,7 +76,24 @@ class InvitationController extends Controller
 
         $invitationLink = route('invitations.show', $token);
 
-        return back()->with('success', "Invitation créée pour {$invitedEmail}. Lien: {$invitationLink}");
+        try {
+            Mail::raw(
+                "Bonjour,\n\nVous avez recu une invitation pour rejoindre la colocation '{$ownerColocation->name}'.\n\nLien invitation:\n{$invitationLink}\n\nCe lien expire le {$invitation->expires_at->format('Y-m-d H:i')}.",
+                function ($message) use ($invitedEmail, $ownerColocation) {
+                    $message->to($invitedEmail)
+                        ->subject("Invitation EasyColoc - {$ownerColocation->name}");
+                }
+            );
+
+            return back()
+                ->with('success', "Invitation envoyee a {$invitedEmail}. Un email a ete envoye.")
+                ->with('invitation_link', $invitationLink);
+        } catch (Throwable $e) {
+            return back()
+                ->with('success', "Invitation creee pour {$invitedEmail}, mais l'email n'a pas pu etre envoye.")
+                ->with('invitation_link', $invitationLink)
+                ->with('warning', 'Copiez le lien ci-dessous et partagez-le manuellement.');
+        }
     }
 
     public function joinFromLink(Request $request)
@@ -95,29 +115,38 @@ class InvitationController extends Controller
     public function show(Request $request, string $token)
     {
         $invitation = Invitation::where('token', $token)->firstOrFail();
+        $existingUser = User::where('email', $invitation->invited_email)->first();
+
+        if (! $request->user() && ! $existingUser && $invitation->status === 'PENDING') {
+            return redirect()->route('register', [
+                'email' => $invitation->invited_email,
+                'invitation_token' => $invitation->token,
+            ]);
+        }
 
         return view('invitations.show', [
             'invitation' => $invitation,
+            'existingUser' => $existingUser,
+            'authUser' => $request->user(),
         ]);
     }
 
     public function accept(Request $request, string $token)
     {
         $user = $request->user();
-
         $invitation = Invitation::where('token', $token)->firstOrFail();
 
         if ($invitation->status !== 'PENDING') {
-            return back()->withErrors(['invitation' => 'Invitation non valide (déjà traitée).']);
+            return back()->withErrors(['invitation' => 'Invitation non valide (deja traitee).']);
         }
 
         if (now()->greaterThan($invitation->expires_at)) {
             $invitation->update(['status' => 'EXPIRED']);
-            return back()->withErrors(['invitation' => 'Invitation expirée.']);
+            return back()->withErrors(['invitation' => 'Invitation expiree.']);
         }
 
         if ($invitation->invited_email !== $user->email) {
-            return back()->withErrors(['invitation' => 'Cette invitation ne correspond pas à votre email.']);
+            return back()->withErrors(['invitation' => 'Cette invitation ne correspond pas a votre email.']);
         }
 
         $hasActive = $user->colocations()
@@ -126,7 +155,7 @@ class InvitationController extends Controller
             ->exists();
 
         if ($hasActive) {
-            return back()->withErrors(['invitation' => 'Vous avez déjà une colocation active.']);
+            return back()->withErrors(['invitation' => 'Vous avez deja une colocation active.']);
         }
 
         return DB::transaction(function () use ($invitation, $user) {
@@ -140,7 +169,9 @@ class InvitationController extends Controller
                 'accepted_by' => $user->id,
             ]);
 
-            return redirect()->route('dashboard')->with('success', 'Invitation acceptée.');
+            return redirect()
+                ->route('dashboard')
+                ->with('success', 'Invitation acceptee avec succes.');
         });
     }
 
@@ -150,11 +181,11 @@ class InvitationController extends Controller
         $invitation = Invitation::where('token', $token)->firstOrFail();
 
         if ($invitation->invited_email !== $user->email) {
-            return back()->withErrors(['invitation' => 'Cette invitation ne correspond pas à votre email.']);
+            return back()->withErrors(['invitation' => 'Cette invitation ne correspond pas a votre email.']);
         }
 
         if ($invitation->status !== 'PENDING') {
-            return back()->withErrors(['invitation' => 'Invitation non valide (déjà traitée).']);
+            return back()->withErrors(['invitation' => 'Invitation non valide (deja traitee).']);
         }
 
         $invitation->update([
@@ -162,6 +193,8 @@ class InvitationController extends Controller
             'accepted_by' => $user->id,
         ]);
 
-        return redirect()->route('dashboard')->with('success', 'Invitation refusée.');
+        return redirect()
+            ->route('dashboard')
+            ->with('success', 'Invitation refusee.');
     }
 }
