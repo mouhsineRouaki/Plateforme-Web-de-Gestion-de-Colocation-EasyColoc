@@ -87,6 +87,9 @@
 
                     <form method="POST" action="{{ route('register') }}" class="space-y-4">
                         @csrf
+                        @if(!empty($invitationToken))
+                            <input type="hidden" name="invitation_token" value="{{ $invitationToken }}">
+                        @endif
 
                         <!-- Name -->
                         <div>
@@ -112,7 +115,7 @@
                                 class="mt-1 block w-full"
                                 type="email"
                                 name="email"
-                                :value="old('email')"
+                                :value="old('email', $prefilledEmail ?? '')"
                                 required
                                 autocomplete="username"
                             />
