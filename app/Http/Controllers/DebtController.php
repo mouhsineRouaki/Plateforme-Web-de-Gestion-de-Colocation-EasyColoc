@@ -17,7 +17,7 @@ class DebtController extends Controller
             return back()->withErrors(['debt' => 'Cette dette est deja reglee.']);
         }
 
-        if ((int) $debt->from_user_id !== (int) $currentUser->id) {
+        if ($debt->from_user_id !== $currentUser->id) {
             abort(403);
         }
 
