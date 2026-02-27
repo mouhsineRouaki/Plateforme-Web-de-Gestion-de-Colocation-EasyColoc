@@ -12,6 +12,14 @@
                        class="rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-900 hover:bg-slate-50">
                         Retour colocations
                     </a>
+                    <form method="POST" action="{{ route($rolePrefix . '.colocations.leave', $colocation) }}">
+                        @csrf
+                        <button type="submit"
+                                class="rounded-xl border border-rose-300 bg-rose-50 px-4 py-2 text-sm font-semibold text-rose-800 hover:bg-rose-100"
+                                onclick="return confirm('Confirmer quitter la colocation ? Votre reputation sera mise a jour selon vos dettes.')">
+                            Quitter la colocation
+                        </button>
+                    </form>
                     @if($rolePrefix === 'owner')
                         <button type="button"
                                 @click="openCategoryModal = true"
@@ -52,6 +60,7 @@
                                 <p class="font-semibold text-slate-900">{{ $member->name }}</p>
                                 <p class="text-xs text-slate-600">{{ $member->email }}</p>
                                 <p class="mt-1 text-xs font-semibold text-slate-700">{{ $member->pivot->role_in_colocation }}</p>
+                                <p class="mt-1 text-xs text-slate-600">Reputation: {{ $member->reputation_score }}</p>
                                 @if($member->pivot->left_at)
                                     <p class="mt-1 text-xs font-semibold text-rose-600">A quitte la colocation</p>
                                 @endif
@@ -198,7 +207,7 @@
             <div class="relative w-full max-w-2xl rounded-2xl border border-slate-200 bg-white shadow-xl">
                 <div class="border-b border-slate-200 p-5">
                     <h3 class="text-lg font-semibold text-slate-900">Ajouter une depense</h3>
-                    <p class="mt-1 text-sm text-slate-600">Saisissez le montant total puis les parts par membre.</p>
+                    <p class="mt-1 text-sm text-slate-600">Le montant est reparti automatiquement a parts egales entre tous les membres actifs.</p>
                 </div>
 
                 <form method="POST" action="{{ route('expenses.store') }}" class="p-5">
@@ -235,31 +244,16 @@
                     <div class="mt-5 rounded-xl border border-slate-200 bg-slate-50 p-4">
                         <div class="flex items-center justify-between">
                             <h4 class="text-sm font-semibold text-slate-800">Repartition des parts</h4>
-                            <button type="button"
-                                    class="rounded-lg border border-slate-300 bg-white px-3 py-1 text-xs font-semibold text-slate-700"
-                                    onclick="
-                                        const amount = parseFloat(document.getElementById('expense_amount').value || '0');
-                                        const inputs = document.querySelectorAll('[data-share-input]');
-                                        if (!inputs.length || amount <= 0) return;
-                                        const base = (amount / inputs.length).toFixed(2);
-                                        inputs.forEach(input => input.value = base);
-                                    ">
-                                Split egal
-                            </button>
+                            <span class="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-700">
+                                Partage egal automatique
+                            </span>
                         </div>
 
                         <div class="mt-3 grid gap-3 sm:grid-cols-2">
-                            @foreach($activeMembers as $index => $member)
-                                <div>
-                                    <input type="hidden" name="splits[{{ $index }}][user_id]" value="{{ $member->id }}">
-                                    <label class="text-xs font-semibold text-slate-700">{{ $member->name }}</label>
-                                    <input data-share-input
-                                           type="number"
-                                           step="0.01"
-                                           min="0"
-                                           name="splits[{{ $index }}][share_amount]"
-                                           required
-                                           class="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2">
+                            @foreach($activeMembers as $member)
+                                <div class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700">
+                                    <span class="font-semibold">{{ $member->name }}</span>
+                                    <span class="ml-1 text-slate-500">(part egale)</span>
                                 </div>
                             @endforeach
                         </div>
