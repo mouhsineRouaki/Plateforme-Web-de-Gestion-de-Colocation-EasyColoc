@@ -3,7 +3,41 @@
     $itemBase = 'rounded-xl px-3 py-2 text-sm font-semibold transition';
     $itemIdle = $itemBase . ' text-slate-700 hover:bg-slate-100';
     $itemActive = $itemBase . ' bg-emerald-100 text-emerald-800';
-    $roleLabel = request()->routeIs('owner.*') ? 'Owner' : (request()->routeIs('member.*') ? 'Member' : ($user->role === 'GLOBAL_ADMIN' ? 'Admin' : 'User'));
+
+    $hasOwnerRole = $user->colocations()
+        ->wherePivot('role_in_colocation', 'OWNER')
+        ->wherePivotNull('left_at')
+        ->where('status', 'ACTIVE')
+        ->exists();
+
+    $hasMemberRole = $user->colocations()
+        ->wherePivot('role_in_colocation', 'MEMBER')
+        ->wherePivotNull('left_at')
+        ->where('status', 'ACTIVE')
+        ->exists();
+
+    if (request()->routeIs('admin.*')) {
+        $menuKey = 'admin';
+        $roleLabel = 'Admin';
+    } elseif (request()->routeIs('owner.*')) {
+        $menuKey = 'owner';
+        $roleLabel = 'Owner';
+    } elseif (request()->routeIs('member.*')) {
+        $menuKey = 'member';
+        $roleLabel = 'Member';
+    } elseif ($user->role === 'GLOBAL_ADMIN') {
+        $menuKey = 'admin';
+        $roleLabel = 'Admin';
+    } elseif ($hasOwnerRole) {
+        $menuKey = 'owner';
+        $roleLabel = 'Owner';
+    } elseif ($hasMemberRole) {
+        $menuKey = 'member';
+        $roleLabel = 'Member';
+    } else {
+        $menuKey = 'user';
+        $roleLabel = 'User';
+    }
 @endphp
 
 <header class="sticky top-0 z-40 border-b border-slate-200/80 bg-white/90 backdrop-blur">
@@ -23,15 +57,7 @@
             </a>
 
             <nav class="hidden items-center gap-2 md:flex">
-                @if($user->role === 'GLOBAL_ADMIN')
-                    @include('layouts.navigation.admin')
-                @elseif(request()->routeIs('owner.*'))
-                    @include('layouts.navigation.owner')
-                @elseif(request()->routeIs('member.*'))
-                    @include('layouts.navigation.member')
-                @else
-                    @include('layouts.navigation.user')
-                @endif
+                @include('layouts.navigation.' . $menuKey)
             </nav>
         </div>
 
@@ -52,15 +78,7 @@
 
     <div class="border-t border-slate-100 px-4 py-2 md:hidden">
         <nav class="flex flex-wrap items-center gap-2">
-            @if($user->role === 'GLOBAL_ADMIN')
-                @include('layouts.navigation.admin')
-            @elseif(request()->routeIs('owner.*'))
-                @include('layouts.navigation.owner')
-            @elseif(request()->routeIs('member.*'))
-                @include('layouts.navigation.member')
-            @else
-                @include('layouts.navigation.user')
-            @endif
+            @include('layouts.navigation.' . $menuKey)
         </nav>
     </div>
 </header>

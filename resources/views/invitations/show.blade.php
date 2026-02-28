@@ -34,6 +34,18 @@
                 Expire le : <span class="font-semibold">{{ $invitation->expires_at->format('Y-m-d H:i') }}</span>
             </p>
 
+            <div class="mt-5 rounded-xl border border-slate-200 bg-slate-50 p-4">
+                <h2 class="text-sm font-semibold text-slate-900">Membres actifs, roles et reputation</h2>
+                <div class="mt-3 grid gap-2 sm:grid-cols-2">
+                    @foreach($activeMembers as $member)
+                        <div class="rounded-lg border border-slate-200 bg-white px-3 py-2">
+                            <p class="text-sm font-semibold text-slate-900">{{ $member->name }}</p>
+                            <p class="text-xs text-slate-600">{{ $member->pivot->role_in_colocation }} | Reputation: {{ $member->reputation_score }}</p>
+                        </div>
+                    @endforeach
+                </div>
+            </div>
+
             @if($invitation->status !== 'PENDING')
                 <p class="mt-4 text-sm font-semibold text-slate-700">
                     Cette invitation est deja traitee.

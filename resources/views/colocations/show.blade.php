@@ -21,6 +21,14 @@
                         </button>
                     </form>
                     @if($rolePrefix === 'owner')
+                        <form method="POST" action="{{ route('owner.colocations.cancel', $colocation) }}">
+                            @csrf
+                            <button type="submit"
+                                    class="rounded-xl border border-amber-300 bg-amber-50 px-4 py-2 text-sm font-semibold text-amber-800 hover:bg-amber-100"
+                                    onclick="return confirm('Annuler cette colocation ? Cette action ferme la colocation pour tous les membres.')">
+                                Annuler colocation
+                            </button>
+                        </form>
                         <button type="button"
                                 @click="openCategoryModal = true"
                                 class="rounded-xl border border-emerald-300 bg-emerald-50 px-4 py-2 text-sm font-semibold text-emerald-800 hover:bg-emerald-100">
@@ -41,6 +49,19 @@
                 </div>
             @endif
 
+            @if (session('warning'))
+                <div class="mt-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+                    {{ session('warning') }}
+                </div>
+            @endif
+
+            @if (session('invitation_link'))
+                <div class="mt-4 rounded-xl border border-slate-200 bg-white p-4">
+                    <p class="text-sm font-semibold text-slate-900">Lien invitation</p>
+                    <p class="mt-2 break-all text-sm text-slate-700">{{ session('invitation_link') }}</p>
+                </div>
+            @endif
+
             @if ($errors->any())
                 <div class="mt-4 rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-800">
                     <ul class="list-disc pl-5">
@@ -52,6 +73,14 @@
             @endif
 
             <div class="mt-6 grid gap-6 lg:grid-cols-2">
+                <section class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm lg:col-span-2">
+                    <h2 class="text-lg font-semibold text-slate-900">Mon solde</h2>
+                    <p class="mt-2 text-sm text-slate-600">Positif = vous devez recevoir. Negatif = vous devez payer.</p>
+                    <p class="mt-3 text-2xl font-semibold {{ $userBalance >= 0 ? 'text-emerald-700' : 'text-rose-700' }}">
+                        {{ number_format($userBalance, 2) }} DH
+                    </p>
+                </section>
+
                 <section class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
                     <h2 class="text-lg font-semibold text-slate-900">Membres de la colocation</h2>
                     <div class="mt-4 grid gap-3 sm:grid-cols-2">
@@ -91,18 +120,94 @@
                     @else
                         <div class="mt-4 space-y-2">
                             @foreach($debts as $debt)
-                                <div class="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700">
-                                    <span class="font-semibold">{{ $debt->fromUser->name }}</span>
-                                    doit
-                                    <span class="font-semibold">{{ number_format($debt->amount, 2) }} DH</span>
-                                    a
-                                    <span class="font-semibold">{{ $debt->toUser->name }}</span>
+                                <div class="flex items-center justify-between gap-3 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700">
+                                    <div>
+                                        <span class="font-semibold">{{ $debt->fromUser->name }}</span>
+                                        doit
+                                        <span class="font-semibold">{{ number_format($debt->amount, 2) }} DH</span>
+                                        a
+                                        <span class="font-semibold">{{ $debt->toUser->name }}</span>
+                                    </div>
+
+                                    @if((int) $debt->from_user_id === (int) auth()->id())
+                                        <form method="POST" action="{{ route('debts.markPaid', $debt) }}">
+                                            @csrf
+                                            <button type="submit"
+                                                    class="rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-emerald-700">
+                                                Mark as paye
+                                            </button>
+                                        </form>
+                                    @endif
                                 </div>
                             @endforeach
                         </div>
                     @endif
                 </section>
             </div>
+
+            <section class="mt-6 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+                <div class="flex items-center justify-between gap-3">
+                    <h2 class="text-lg font-semibold text-slate-900">Depenses</h2>
+                    <div class="flex items-center gap-2">
+                        <a href="{{ route($rolePrefix . '.colocations.show', $colocation) }}"
+                           class="rounded-lg px-3 py-1 text-xs font-semibold {{ ($expenseScope ?? 'all') === 'all' ? 'bg-emerald-600 text-white' : 'border border-slate-300 bg-white text-slate-700' }}">
+                            Toutes
+                        </a>
+                        <a href="{{ route($rolePrefix . '.colocations.show', ['colocation' => $colocation, 'expense_scope' => 'mine', 'expense_month' => ($expenseMonth ?? '')]) }}"
+                           class="rounded-lg px-3 py-1 text-xs font-semibold {{ ($expenseScope ?? 'all') === 'mine' ? 'bg-emerald-600 text-white' : 'border border-slate-300 bg-white text-slate-700' }}">
+                            Mes depenses
+                        </a>
+                    </div>
+                </div>
+
+                <form method="GET" action="{{ route($rolePrefix . '.colocations.show', $colocation) }}" class="mt-3 flex items-center gap-2">
+                    <input type="hidden" name="expense_scope" value="{{ $expenseScope ?? 'all' }}">
+                    <label for="expense_month" class="text-xs font-semibold text-slate-700">Mois:</label>
+                    <select id="expense_month"
+                            name="expense_month"
+                            class="rounded-lg border border-slate-300 bg-white px-2 py-1 text-xs text-slate-700">
+                        <option value="">Tous les mois</option>
+                        @foreach(($availableExpenseMonths ?? collect()) as $month)
+                            <option value="{{ $month }}" {{ ($expenseMonth ?? '') === $month ? 'selected' : '' }}>
+                                {{ $month }}
+                            </option>
+                        @endforeach
+                    </select>
+                    <button type="submit"
+                            class="rounded-lg border border-slate-300 bg-white px-3 py-1 text-xs font-semibold text-slate-700 hover:bg-slate-50">
+                        Filtrer
+                    </button>
+                </form>
+
+                @if(($expenses ?? collect())->isEmpty())
+                    <p class="mt-4 text-sm text-slate-600">Aucune depense trouvee pour ce filtre.</p>
+                @else
+                    <div class="mt-4 overflow-x-auto">
+                        <table class="min-w-full text-left text-sm">
+                            <thead class="border-b border-slate-200 text-slate-600">
+                                <tr>
+                                    <th class="px-3 py-2">Date</th>
+                                    <th class="px-3 py-2">Titre</th>
+                                    <th class="px-3 py-2">Categorie</th>
+                                    <th class="px-3 py-2">Payeur</th>
+                                    <th class="px-3 py-2">Montant</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach($expenses as $expense)
+                                    <tr class="border-b border-slate-100">
+                                        <td class="px-3 py-2">{{ \Illuminate\Support\Carbon::parse($expense->spent_at)->format('Y-m-d') }}</td>
+                                        <td class="px-3 py-2">{{ $expense->title }}</td>
+                                        <td class="px-3 py-2">{{ optional($expense->category)->name ?? '-' }}</td>
+                                        <td class="px-3 py-2">{{ optional($expense->payer)->name ?? '-' }}</td>
+                                        <td class="px-3 py-2 font-semibold">{{ number_format($expense->amount, 2) }} DH</td>
+                                    </tr>
+                                @endforeach
+                            </tbody>
+                        </table>
+                    </div>
+                @endif
+            </section>
 
             <section class="mt-6 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
                 <div class="flex items-center justify-between gap-3">
@@ -129,6 +234,30 @@
                     </div>
                 @endif
             </section>
+
+            @if($rolePrefix === 'owner')
+                <section class="mt-6 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+                    <h2 class="text-lg font-semibold text-slate-900">Inviter un membre</h2>
+                    <p class="mt-1 text-sm text-slate-600">Envoyez une invitation par email pour cette colocation.</p>
+
+                    <form method="POST" action="{{ route('invitations.send') }}" class="mt-4">
+                        @csrf
+                        <input type="hidden" name="colocation_id" value="{{ $colocation->id }}">
+                        <div class="flex flex-col gap-3 sm:flex-row">
+                            <input id="invited_email_details"
+                                   name="invited_email"
+                                   type="email"
+                                   required
+                                   class="w-full rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm"
+                                   placeholder="exemple@email.com" />
+                            <button type="submit"
+                                    class="rounded-xl bg-emerald-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-emerald-700">
+                                Envoyer invitation
+                            </button>
+                        </div>
+                    </form>
+                </section>
+            @endif
 
             <section class="mt-6 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
                 <h2 class="text-lg font-semibold text-slate-900">Paiements enregistres</h2>
