@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Owner;
 
 use App\Models\Colocation;
 use App\Models\Debt;
+use App\Models\Expense;
 use App\Models\Payment;
 use App\Models\ReputationEvent;
 use App\Models\User;
@@ -15,19 +16,7 @@ class OwnerColocationController extends Controller
 {
     public function index(Request $request)
     {
-        $user = $request->user();
-
-        $colocations = $user->colocations()
-            ->wherePivot('role_in_colocation', 'OWNER')
-            ->with(['members' => function ($query) {
-                $query->wherePivotNull('left_at');
-            }])
-            ->orderByDesc('colocations.created_at')
-            ->get();
-
-        return view('owner.colocations.index', [
-            'colocations' => $colocations,
-        ]);
+        return redirect()->route('colocations.history');
     }
 
     public function show(Request $request, Colocation $colocation)
@@ -55,16 +44,71 @@ class OwnerColocationController extends Controller
             ->limit(20)
             ->get();
 
+        $expenseScope = $request->query('expense_scope', 'all');
+        if (! in_array($expenseScope, ['all', 'mine'], true)) {
+            $expenseScope = 'all';
+        }
+
+        $expenseMonth = (string) $request->query('expense_month', '');
+        if ($expenseMonth !== '' && ! preg_match('/^\d{4}-\d{2}$/', $expenseMonth)) {
+            $expenseMonth = '';
+        }
+
+        $expensesQuery = Expense::with([
+            'payer:id,name',
+            'category:id,name',
+        ])
+            ->where('colocation_id', $colocation->id)
+            ->orderByDesc('spent_at')
+            ->orderByDesc('id');
+
+        if ($expenseScope === 'mine') {
+            $expensesQuery->where('payer_id', $user->id);
+        }
+
+        if ($expenseMonth !== '') {
+            [$year, $month] = array_map('intval', explode('-', $expenseMonth));
+            $expensesQuery
+                ->whereYear('spent_at', $year)
+                ->whereMonth('spent_at', $month);
+        }
+
+        $expenses = $expensesQuery->limit(100)->get();
+
+        $availableExpenseMonths = Expense::query()
+            ->where('colocation_id', $colocation->id)
+            ->orderByDesc('spent_at')
+            ->get(['spent_at'])
+            ->map(function ($row) {
+                return \Illuminate\Support\Carbon::parse($row->spent_at)->format('Y-m');
+            })
+            ->unique()
+            ->values();
+
         $activeMembers = $colocation->members->filter(function ($member) {
             return $member->pivot->left_at === null;
         })->values();
+
+        $userBalance = (float) Debt::query()
+            ->where('colocation_id', $colocation->id)
+            ->where('amount', '>', 0)
+            ->selectRaw('
+                COALESCE(SUM(CASE WHEN to_user_id = ? THEN amount ELSE 0 END), 0) -
+                COALESCE(SUM(CASE WHEN from_user_id = ? THEN amount ELSE 0 END), 0) as balance
+            ', [$user->id, $user->id])
+            ->value('balance');
 
         return view('colocations.show', [
             'rolePrefix' => 'owner',
             'colocation' => $colocation,
             'activeMembers' => $activeMembers,
             'debts' => $debts,
+            'expenses' => $expenses,
+            'expenseScope' => $expenseScope,
+            'expenseMonth' => $expenseMonth,
+            'availableExpenseMonths' => $availableExpenseMonths,
             'payments' => $payments,
+            'userBalance' => $userBalance,
         ]);
     }
 
@@ -184,6 +228,44 @@ class OwnerColocationController extends Controller
         return redirect()
             ->route('dashboard')
             ->with('success', "Vous avez quitte la colocation. {$successor->name} est maintenant owner.");
+    }
+
+    public function cancel(Request $request, Colocation $colocation)
+    {
+        $owner = $request->user();
+
+        $ownerMembership = $owner->colocations()
+            ->where('colocations.id', $colocation->id)
+            ->wherePivot('role_in_colocation', 'OWNER')
+            ->wherePivotNull('left_at')
+            ->exists();
+
+        abort_if(! $ownerMembership, 403);
+
+        if ($colocation->status === 'CANCELLED') {
+            return back()->withErrors([
+                'colocation' => 'Cette colocation est deja annulee.',
+            ]);
+        }
+
+        DB::transaction(function () use ($colocation) {
+            $colocation->update([
+                'status' => 'CANCELLED',
+                'cancelled_at' => now(),
+            ]);
+
+            DB::table('colocation_user')
+                ->where('colocation_id', $colocation->id)
+                ->whereNull('left_at')
+                ->update([
+                    'left_at' => now(),
+                    'updated_at' => now(),
+                ]);
+        });
+
+        return redirect()
+            ->route('owner.dashboard')
+            ->with('success', 'Colocation annulee avec succes.');
     }
 
     private function reassignMemberDebtsToReplacement(int $colocationId, int $leavingUserId, int $replacementUserId): void

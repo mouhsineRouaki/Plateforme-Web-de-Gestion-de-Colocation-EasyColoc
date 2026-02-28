@@ -16,13 +16,13 @@ class IsMember
 
         $user = auth()->user();
 
-        $hasMemberRole = $user->colocations()
+        $memberRole = $user->colocations()
             ->wherePivot('role_in_colocation', 'MEMBER')
             ->wherePivotNull('left_at')
             ->where('status', 'ACTIVE')
             ->exists();
 
-        if (! $hasMemberRole) {
+        if (! $memberRole) {
             abort(403);
         }
 

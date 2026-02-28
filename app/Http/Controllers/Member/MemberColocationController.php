@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Member;
 
 use App\Models\Colocation;
 use App\Models\Debt;
+use App\Models\Expense;
 use App\Models\Payment;
 use App\Models\ReputationEvent;
 use App\Models\User;
@@ -15,19 +16,7 @@ class MemberColocationController extends Controller
 {
     public function index(Request $request)
     {
-        $user = $request->user();
-
-        $colocations = $user->colocations()
-            ->wherePivot('role_in_colocation', 'MEMBER')
-            ->with(['members' => function ($query) {
-                $query->wherePivotNull('left_at');
-            }])
-            ->orderByDesc('colocations.created_at')
-            ->get();
-
-        return view('member.colocations.index', [
-            'colocations' => $colocations,
-        ]);
+        return redirect()->route('colocations.history');
     }
 
     public function show(Request $request, Colocation $colocation)
@@ -55,16 +44,71 @@ class MemberColocationController extends Controller
             ->limit(20)
             ->get();
 
+        $expenseScope = $request->query('expense_scope', 'all');
+        if (! in_array($expenseScope, ['all', 'mine'], true)) {
+            $expenseScope = 'all';
+        }
+
+        $expenseMonth = (string) $request->query('expense_month', '');
+        if ($expenseMonth !== '' && ! preg_match('/^\d{4}-\d{2}$/', $expenseMonth)) {
+            $expenseMonth = '';
+        }
+
+        $expensesQuery = Expense::with([
+            'payer:id,name',
+            'category:id,name',
+        ])
+            ->where('colocation_id', $colocation->id)
+            ->orderByDesc('spent_at')
+            ->orderByDesc('id');
+
+        if ($expenseScope === 'mine') {
+            $expensesQuery->where('payer_id', $user->id);
+        }
+
+        if ($expenseMonth !== '') {
+            [$year, $month] = array_map('intval', explode('-', $expenseMonth));
+            $expensesQuery
+                ->whereYear('spent_at', $year)
+                ->whereMonth('spent_at', $month);
+        }
+
+        $expenses = $expensesQuery->limit(100)->get();
+
+        $availableExpenseMonths = Expense::query()
+            ->where('colocation_id', $colocation->id)
+            ->orderByDesc('spent_at')
+            ->get(['spent_at'])
+            ->map(function ($row) {
+                return \Illuminate\Support\Carbon::parse($row->spent_at)->format('Y-m');
+            })
+            ->unique()
+            ->values();
+
         $activeMembers = $colocation->members->filter(function ($member) {
             return $member->pivot->left_at === null;
         })->values();
+
+        $userBalance = Debt::query()
+            ->where('colocation_id', $colocation->id)
+            ->where('amount', '>', 0)
+            ->selectRaw('
+                COALESCE(SUM(CASE WHEN to_user_id = ? THEN amount ELSE 0 END), 0) -
+                COALESCE(SUM(CASE WHEN from_user_id = ? THEN amount ELSE 0 END), 0) as balance
+            ', [$user->id, $user->id])
+            ->value('balance');
 
         return view('colocations.show', [
             'rolePrefix' => 'member',
             'colocation' => $colocation,
             'activeMembers' => $activeMembers,
             'debts' => $debts,
+            'expenses' => $expenses,
+            'expenseScope' => $expenseScope,
+            'expenseMonth' => $expenseMonth,
+            'availableExpenseMonths' => $availableExpenseMonths,
             'payments' => $payments,
+            'userBalance' => $userBalance,
         ]);
     }
 
@@ -91,20 +135,20 @@ class MemberColocationController extends Controller
             ]);
         }
 
-        $hasDebtBeforeLeave = Debt::query()
+        $ilaDejaDebt = Debt::query()
             ->where('colocation_id', $colocation->id)
             ->where('from_user_id', $member->id)
             ->where('amount', '>', 0)
             ->exists();
 
-        DB::transaction(function () use ($colocation, $member, $activeOwner, $hasDebtBeforeLeave) {
+        DB::transaction(function () use ($colocation, $member, $activeOwner, $ilaDejaDebt) {
             $this->reassignMemberDebtsToReplacement($colocation->id, $member->id, $activeOwner->id);
 
             $colocation->members()->updateExistingPivot($member->id, [
                 'left_at' => now(),
             ]);
 
-            $this->applyLeaveReputation($member, $colocation->id, $hasDebtBeforeLeave);
+            $this->applyLeaveReputation($member, $colocation->id, $ilaDejaDebt);
         });
 
         return redirect()
@@ -144,15 +188,15 @@ class MemberColocationController extends Controller
 
     private function applyLeaveReputation(User $user, int $colocationId, bool $hasDebt): void
     {
-        $delta = $hasDebt ? -1 : 1;
+        $reput = $hasDebt ? -1 : 1;
 
-        $user->increment('reputation_score', $delta);
+        $user->increment('reputation_score', $reput);
 
         ReputationEvent::create([
             'user_id' => $user->id,
             'colocation_id' => $colocationId,
-            'type' => $hasDebt ? 'LEAVE_WITH_DEBT' : 'LEAVE_WITHOUT_DEBT',
-            'delta' => $delta,
+            'type' => $hasDebt ? 'Debt' : 'NoDebt',
+            'delta' => $reput,
             'meta' => [
                 'reason' => 'leave_colocation',
             ],
@@ -183,8 +227,8 @@ class MemberColocationController extends Controller
             ['amount' => 0]
         );
 
-        $sameAmount = (float) $sameDirection->amount;
-        $reverseAmount = (float) $reverseDirection->amount;
+        $sameAmount = $sameDirection->amount;
+        $reverseAmount = $reverseDirection->amount;
 
         if ($reverseAmount > 0) {
             if ($reverseAmount >= $amount) {

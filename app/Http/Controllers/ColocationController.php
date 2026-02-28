@@ -15,7 +15,7 @@ class ColocationController extends Controller
         $data = $request->validate([
             'name' => ['required', 'string', 'max:120'],
             'description' => ['nullable', 'string', 'max:1000'],
-            'image' => ['nullable', 'string', 'max:255'], // si tu veux url/path
+            'image' => ['nullable', 'string', 'max:255'],
         ]);
 
         $hasActive = $user->colocations()
@@ -23,7 +23,7 @@ class ColocationController extends Controller
             ->where('status', 'ACTIVE')
             ->exists();
 
-        if ($hasActive) {
+        if ($user->role !== 'GLOBAL_ADMIN' && $hasActive) {
             return back()->withErrors([
                 'colocation' => "Vous avez déjà une colocation active."
             ])->withInput();

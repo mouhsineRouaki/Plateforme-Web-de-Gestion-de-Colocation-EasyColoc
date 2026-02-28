@@ -16,20 +16,29 @@ class InvitationController extends Controller
     {
         $data = $request->validate([
             'invited_email' => ['required', 'email', 'max:255'],
+            'colocation_id' => ['nullable', 'integer', 'exists:colocations,id'],
         ]);
 
         $currentUser = $request->user();
         $invitedEmail = strtolower(trim($data['invited_email']));
 
-        $ownerColocation = $currentUser->colocations()
+        $ownerColocationsQuery = $currentUser->colocations()
             ->wherePivotNull('left_at')
             ->wherePivot('role_in_colocation', 'OWNER')
-            ->where('status', 'ACTIVE')
-            ->first();
+            ->where('status', 'ACTIVE');
+
+        $ownerColocation = null;
+        if (! empty($data['colocation_id'])) {
+            $ownerColocation = (clone $ownerColocationsQuery)
+                ->where('colocations.id', (int) $data['colocation_id'])
+                ->first();
+        } else {
+            $ownerColocation = (clone $ownerColocationsQuery)->first();
+        }
 
         if (! $ownerColocation) {
             return back()->withErrors([
-                'invited_email' => 'Vous devez etre owner d une colocation active.',
+                'invited_email' => 'Vous devez etre owner de la colocation cible.',
             ]);
         }
 
@@ -114,7 +123,7 @@ class InvitationController extends Controller
 
     public function show(Request $request, string $token)
     {
-        $invitation = Invitation::where('token', $token)->firstOrFail();
+        $invitation = Invitation::with(['colocation.members' => function ($query) {$query->wherePivotNull('left_at');},])->where('token', $token)->firstOrFail();
         $existingUser = User::where('email', $invitation->invited_email)->first();
 
         if (! $request->user() && ! $existingUser && $invitation->status === 'PENDING') {
@@ -128,6 +137,7 @@ class InvitationController extends Controller
             'invitation' => $invitation,
             'existingUser' => $existingUser,
             'authUser' => $request->user(),
+            'activeMembers' => $invitation->colocation->members,
         ]);
     }
 
@@ -154,7 +164,7 @@ class InvitationController extends Controller
             ->where('status', 'ACTIVE')
             ->exists();
 
-        if ($hasActive) {
+        if ($user->role !== 'GLOBAL_ADMIN' && $hasActive) {
             return back()->withErrors(['invitation' => 'Vous avez deja une colocation active.']);
         }
 

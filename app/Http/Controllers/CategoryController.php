@@ -12,18 +12,14 @@ class CategoryController extends Controller
     public function store(Request $request, Colocation $colocation)
     {
         $request->validate([
-            'name' => [
-                'required',
-                'string',
-                'max:100',
-            ],
+            'name' => ['required','string','max:100',],
             'color' => ['nullable', 'string', 'max:20'],
         ]);
 
         Category::create([
             'colocation_id' => $colocation->id,
             'name' => trim($request->name),
-            'color' => $request->color ?: '#10b981',
+            'color' => $request->color,
         ]);
 
         return back()->with('success', 'Categorie ajoutee avec succes.');

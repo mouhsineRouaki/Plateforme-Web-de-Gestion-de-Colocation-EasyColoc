@@ -16,13 +16,13 @@ class IsOwner
 
         $user = auth()->user();
 
-        $hasOwnerRole = $user->colocations()
+        $ownerRole = $user->colocations()
             ->wherePivot('role_in_colocation', 'OWNER')
             ->wherePivotNull('left_at')
             ->where('status', 'ACTIVE')
             ->exists();
 
-        if (! $hasOwnerRole) {
+        if (! $ownerRole) {
             abort(403);
         }
 
