@@ -70,10 +70,10 @@ class ExpenseController extends Controller
                     'share_amount' => $share,
                 ]);
 
-                if ((int) $userId === (int) $payerId) {
+                if ($userId === $payerId) {
                     continue;
                 }
-                $this->addDebtMembers($colocationId, $userId, $payerId, $share);
+                $this->addDetteMembers($colocationId, $userId, $payerId, $share);
             }
         });
 
@@ -89,13 +89,13 @@ class ExpenseController extends Controller
         $shares = [];   
 
         foreach ($memberIds as $memberId) {
-            $shares[$memberId] = round($part , 2) ;
+            $shares[$memberId] = $part;
         }
 
         return $shares;
     }
 
-    private function addDebtMembers(int $colocationId, int $debtorId, int $creditorId, float $amount): void
+    private function addDetteMembers(int $colocationId, int $debtorId, int $creditorId, float $amount): void
     {
         if ($amount <= 0 || $debtorId === $creditorId) {
             return;
