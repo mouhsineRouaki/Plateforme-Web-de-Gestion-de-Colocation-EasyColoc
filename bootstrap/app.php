@@ -15,8 +15,8 @@ return Application::configure(basePath: dirname(__DIR__))
             'globalAdmin' => \App\Http\Middleware\IsGlobalAdmin::class,
             'owner' => \App\Http\Middleware\IsOwner::class,
             'member' => \App\Http\Middleware\IsMember::class,
+            'notBanned' => \App\Http\Middleware\RejectBannedUser::class,
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
-        //
     })->create();
