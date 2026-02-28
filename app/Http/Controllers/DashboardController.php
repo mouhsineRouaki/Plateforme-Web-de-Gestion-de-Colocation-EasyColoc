@@ -9,9 +9,25 @@ class DashboardController extends Controller
     public function index(Request $request)
     {
         $user = $request->user();
+        $isGlobalAdmin = $user->role === 'GLOBAL_ADMIN';
+        $activeColocations = collect();
 
-        if ($user->role === 'GLOBAL_ADMIN') {
-            return redirect()->route('admin.dashboard');
+        if ($isGlobalAdmin) {
+            $activeColocations = $user->colocations()
+                ->wherePivotNull('left_at')
+                ->where('status', 'ACTIVE')
+                ->with(['members' => function ($query) {
+                    $query->wherePivotNull('left_at');
+                }])
+                ->orderByDesc('colocations.created_at')
+                ->get();
+
+            return view('dashboard', [
+                'user' => $user,
+                'activeColocation' => $activeColocations->first(),
+                'activeColocations' => $activeColocations,
+                'isGlobalAdmin' => true,
+            ]);
         }
 
         $activeOwnerColocation = $user->colocations()
@@ -37,6 +53,8 @@ class DashboardController extends Controller
         return view('dashboard', [
             'user' => $user,
             'activeColocation' => null,
+            'activeColocations' => collect(),
+            'isGlobalAdmin' => false,
         ]);
     }
 }
