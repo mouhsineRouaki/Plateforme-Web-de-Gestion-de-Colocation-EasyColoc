@@ -10,7 +10,7 @@ class AdminUserController extends Controller
 {
     public function index(Request $request)
     {
-        $q = trim((string) $request->query('q', ''));
+        $q = trim( $request->query('q', ''));
         $status = $request->query('status'); // active | banned | null
 
         $users = User::query()
