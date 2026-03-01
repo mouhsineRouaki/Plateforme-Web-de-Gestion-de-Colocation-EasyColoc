@@ -49,6 +49,17 @@ class LoginRequest extends FormRequest
             ]);
         }
 
+        $user = Auth::user();
+
+        if ($user && (bool) $user->is_banned) {
+            Auth::guard('web')->logout();
+            RateLimiter::hit($this->throttleKey());
+
+            throw ValidationException::withMessages([
+                'email' => 'Votre compte est banni. Acces refuse.',
+            ]);
+        }
+
         RateLimiter::clear($this->throttleKey());
     }
 

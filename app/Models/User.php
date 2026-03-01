@@ -4,8 +4,17 @@ namespace App\Models;
 
 // use Illuminate\Contracts\Auth\MustVerifyEmail;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
+use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
+use App\Models\Invitation;
+use App\Models\Category;
+use App\Models\Colocation;
+use App\Models\Expense;
+use App\Models\Payment;
+use App\Models\ReputationEvent;
 
 class User extends Authenticatable
 {
@@ -18,9 +27,13 @@ class User extends Authenticatable
      * @var list<string>
      */
     protected $fillable = [
+        'id',
         'name',
         'email',
         'password',
+        'role',
+        'is_banned',
+        'reputation_score'
     ];
 
     /**
@@ -44,5 +57,53 @@ class User extends Authenticatable
             'email_verified_at' => 'datetime',
             'password' => 'hashed',
         ];
+    }
+    public function createdColocations(): HasMany
+    {
+        return $this->hasMany(Colocation::class, 'created_by');
+    }
+
+    public function colocations(): BelongsToMany
+    {
+        return $this->belongsToMany(Colocation::class, 'colocation_user')->withPivot(['role_in_colocation', 'joined_at', 'left_at'])->withTimestamps();
+    }
+    public function sentInvitations(): HasMany
+    {
+        return $this->hasMany(Invitation::class, 'sent_by');
+    }
+
+    public function acceptedInvitations(): HasMany
+    {
+        return $this->hasMany(Invitation::class, 'accepted_by');
+    }
+
+    public function paidExpenses(): HasMany
+    {
+        return $this->hasMany(Expense::class, 'payer_id');
+    }
+    public function paymentsFrom(): HasMany
+    {
+        return $this->hasMany(Payment::class, 'from_user_id');
+    }
+    public function paymentsTo(): HasMany
+    {
+        return $this->hasMany(Payment::class, 'to_user_id');
+    }
+    public function createdPayments(): HasMany
+    {
+        return $this->hasMany(Payment::class, 'created_by');
+    }
+    public function reputationEvents(): HasMany
+    {
+        return $this->hasMany(ReputationEvent::class);
+    }
+    public function debtsOwed(): HasMany
+    {
+        return $this->hasMany(Debt::class, 'from_user_id');
+    }
+
+    public function debtsToReceive(): HasMany
+    {
+        return $this->hasMany(Debt::class, 'to_user_id');
     }
 }
