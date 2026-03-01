@@ -49,7 +49,7 @@ class OwnerColocationController extends Controller
             $expenseScope = 'all';
         }
 
-        $expenseMonth = (string) $request->query('expense_month', '');
+        $expenseMonth = $request->query('expense_month', '');
         if ($expenseMonth !== '' && ! preg_match('/^\d{4}-\d{2}$/', $expenseMonth)) {
             $expenseMonth = '';
         }
@@ -89,7 +89,7 @@ class OwnerColocationController extends Controller
             return $member->pivot->left_at === null;
         })->values();
 
-        $userBalance = (float) Debt::query()
+        $userBalance = Debt::query()
             ->where('colocation_id', $colocation->id)
             ->where('amount', '>', 0)
             ->selectRaw('
@@ -280,17 +280,17 @@ class OwnerColocationController extends Controller
             ->get();
 
         foreach ($memberDebts as $debt) {
-            $amount = (float) $debt->amount;
+            $amount = $debt->amount;
             if ($amount <= 0) {
                 continue;
             }
 
-            if ((int) $debt->from_user_id === $leavingUserId && (int) $debt->to_user_id !== $replacementUserId) {
-                $this->addNetDebt($colocationId, $replacementUserId, (int) $debt->to_user_id, $amount);
+            if ( $debt->from_user_id === $leavingUserId &&  $debt->to_user_id !== $replacementUserId) {
+                $this->addNetDebt($colocationId, $replacementUserId,  $debt->to_user_id, $amount);
             }
 
-            if ((int) $debt->to_user_id === $leavingUserId && (int) $debt->from_user_id !== $replacementUserId) {
-                $this->addNetDebt($colocationId, (int) $debt->from_user_id, $replacementUserId, $amount);
+            if ( $debt->to_user_id === $leavingUserId &&  $debt->from_user_id !== $replacementUserId) {
+                $this->addNetDebt($colocationId, $debt->from_user_id, $replacementUserId, $amount);
             }
 
             $debt->amount = 0;

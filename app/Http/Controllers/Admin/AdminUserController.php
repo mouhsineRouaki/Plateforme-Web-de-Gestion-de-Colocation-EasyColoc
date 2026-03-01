@@ -15,10 +15,7 @@ class AdminUserController extends Controller
 
         $users = User::query()
             ->when($q !== '', function ($query) use ($q) {
-                $query->where(function ($qq) use ($q) {
-                    $qq->where('name', 'ilike', "%{$q}%")
-                       ->orWhere('email', 'ilike', "%{$q}%");
-                });
+                $query->where(function ($qq) use ($q) {$qq->where('name', 'ilike', "%{$q}%")->orWhere('email', 'ilike', "%{$q}%");});
             })
             ->when($status === 'banned', fn($query) => $query->where('is_banned', true))
             ->when($status === 'active', fn($query) => $query->where('is_banned', false))

@@ -40,9 +40,7 @@ class ExpenseController extends Controller
             ])->withInput();
         }
 
-        $activeMemberIds = $colocation->members
-            ->pluck('id')
-            ->values();
+        $activeMemberIds = $colocation->members->pluck('id');
 
         if ($activeMemberIds->isEmpty()) {
             return back()->withErrors([
@@ -55,7 +53,7 @@ class ExpenseController extends Controller
         DB::transaction(function () use ($request, $colocationId, $payerId, $amount, $montantEgale) {
             $expense = Expense::create([
                 'colocation_id' => $colocationId,
-                'category_id' => (int) $request->category_id,
+                'category_id' => $request->category_id,
                 'payer_id' => $payerId,
                 'title' => $request->title,
                 'amount' => $amount,
@@ -66,7 +64,7 @@ class ExpenseController extends Controller
             foreach ($montantEgale as $userId => $share) {
                 ExpenseSplit::create([
                     'expense_id' => $expense->id,
-                    'user_id' => (int) $userId,
+                    'user_id' => $userId,
                     'share_amount' => $share,
                 ]);
 

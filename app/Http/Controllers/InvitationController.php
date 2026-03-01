@@ -105,11 +105,8 @@ class InvitationController extends Controller
         }
     }
 
-    public function joinFromLink(Request $request)
-    {
-        $data = $request->validate([
-            'invite_link' => ['required', 'string', 'max:500'],
-        ]);
+    public function joinFromLink(Request $request){
+        $data = $request->validate(['invite_link' => ['required', 'string', 'max:500'],]);
 
         $token = trim($data['invite_link']);
 
