@@ -6,15 +6,8 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
-use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
-use App\Models\Invitation;
-use App\Models\Category;
-use App\Models\Colocation;
-use App\Models\Expense;
-use App\Models\Payment;
-use App\Models\ReputationEvent;
 
 class User extends Authenticatable
 {
@@ -72,11 +65,6 @@ class User extends Authenticatable
         return $this->hasMany(Invitation::class, 'sent_by');
     }
 
-    public function acceptedInvitations(): HasMany
-    {
-        return $this->hasMany(Invitation::class, 'accepted_by');
-    }
-
     public function paidExpenses(): HasMany
     {
         return $this->hasMany(Expense::class, 'payer_id');
@@ -92,10 +80,6 @@ class User extends Authenticatable
     public function createdPayments(): HasMany
     {
         return $this->hasMany(Payment::class, 'created_by');
-    }
-    public function reputationEvents(): HasMany
-    {
-        return $this->hasMany(ReputationEvent::class);
     }
     public function debtsOwed(): HasMany
     {

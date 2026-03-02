@@ -11,7 +11,7 @@ class AdminUserController extends Controller
     public function index(Request $request)
     {
         $q = trim( $request->query('q', ''));
-        $status = $request->query('status'); // active | banned | null
+        $status = $request->query('status'); 
 
         $users = User::query()
             ->when($q !== '', function ($query) use ($q) {
@@ -28,7 +28,6 @@ class AdminUserController extends Controller
 
     public function ban(User $user)
     {
-        // Empêche l'admin de se bannir lui-même
         if ($user->id === auth()->id()) {
             return back()->with('error', "Vous ne pouvez pas vous bannir vous-même.");
         }

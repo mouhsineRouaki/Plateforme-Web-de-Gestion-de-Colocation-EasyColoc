@@ -168,17 +168,17 @@ class MemberColocationController extends Controller
             ->get();
 
         foreach ($memberDebts as $debt) {
-            $amount = (float) $debt->amount;
+            $amount =  $debt->amount;
             if ($amount <= 0) {
                 continue;
             }
 
-            if ((int) $debt->from_user_id === $leavingUserId && (int) $debt->to_user_id !== $replacementUserId) {
-                $this->addNetDebt($colocationId, $replacementUserId, (int) $debt->to_user_id, $amount);
+            if ( $debt->from_user_id === $leavingUserId &&  $debt->to_user_id !== $replacementUserId) {
+                $this->addNetDebt($colocationId, $replacementUserId,  $debt->to_user_id, $amount);
             }
 
-            if ((int) $debt->to_user_id === $leavingUserId && (int) $debt->from_user_id !== $replacementUserId) {
-                $this->addNetDebt($colocationId, (int) $debt->from_user_id, $replacementUserId, $amount);
+            if ( $debt->to_user_id === $leavingUserId &&  $debt->from_user_id !== $replacementUserId) {
+                $this->addNetDebt($colocationId,  $debt->from_user_id, $replacementUserId, $amount);
             }
 
             $debt->amount = 0;
