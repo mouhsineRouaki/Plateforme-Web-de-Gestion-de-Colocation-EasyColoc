@@ -25,7 +25,7 @@ class ColocationController extends Controller
 
         if ($user->role !== 'GLOBAL_ADMIN' && $hasActive) {
             return back()->withErrors([
-                'colocation' => "Vous avez déjà une colocation active."
+                'colocation' => "Vous avez deja une colocation active."
             ])->withInput();
         }
 

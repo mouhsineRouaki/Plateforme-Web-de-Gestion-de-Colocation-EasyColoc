@@ -20,15 +20,9 @@ class Invitation extends Model
     protected $casts = [
         'expires_at' => 'datetime',
     ];
-    public function colocation(): BelongsTo{
+
+    public function colocation(): BelongsTo
+    {
         return $this->belongsTo(Colocation::class);
-    }
-
-    public function sender(): BelongsTo{
-        return $this->belongsTo(User::class, 'sent_by');
-    }
-
-    public function accepter(): BelongsTo{
-        return $this->belongsTo(User::class, 'accepted_by');
     }
 }

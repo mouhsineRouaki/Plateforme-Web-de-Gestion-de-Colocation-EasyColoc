@@ -152,19 +152,17 @@ class OwnerColocationController extends Controller
                 ->get();
 
             foreach ($memberDebts as $debt) {
-                $amount = (float) $debt->amount;
+                $amount = $debt->amount;
                 if ($amount <= 0) {
                     continue;
                 }
 
-                // dette: membre -> X  devient owner -> X
-                if ((int) $debt->from_user_id === (int) $user->id && (int) $debt->to_user_id !== (int) $owner->id) {
-                    $this->addNetDebt($colocation->id, $owner->id, (int) $debt->to_user_id, $amount);
+                if ($debt->from_user_id === $user->id && $debt->to_user_id !== $owner->id) {
+                    $this->addNetDebt($colocation->id, $owner->id, $debt->to_user_id, $amount);
                 }
 
-                // dette: X -> membre devient X -> owner
-                if ((int) $debt->to_user_id === (int) $user->id && (int) $debt->from_user_id !== (int) $owner->id) {
-                    $this->addNetDebt($colocation->id, (int) $debt->from_user_id, $owner->id, $amount);
+                if ($debt->to_user_id === $user->id && $debt->from_user_id !== $owner->id) {
+                    $this->addNetDebt($colocation->id, $debt->from_user_id, $owner->id, $amount);
                 }
 
                 $debt->amount = 0;
@@ -196,7 +194,6 @@ class OwnerColocationController extends Controller
             ->wherePivot('role_in_colocation', 'MEMBER')
             ->orderByDesc('reputation_score')
             ->orderBy('colocation_user.joined_at')
-            ->orderBy('users.id')
             ->first();
 
         if (! $successor) {
